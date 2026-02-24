@@ -1,0 +1,21 @@
+# Ignore embedded repositories
+2nd-brain/
+antfarm/
+
+# Ignore npm
+node_modules/
+*.log
+
+# Ignore build outputs
+dist/
+build/
+.next/
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
