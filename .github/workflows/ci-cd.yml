@@ -1,6 +1,4 @@
-# Full CI/CD Workflow (Lint + Test + Build + Deploy to Vercel)
-# Use this for production projects that need complete CI/CD pipeline
-
+# CI/CD Workflow for docgen-ai (adapted for subdirectory structure)
 name: CI/CD
 
 on:
@@ -8,16 +6,18 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
-  workflow_dispatch:  # Allow manual triggering
+  workflow_dispatch:
 
 env:
   NODE_VERSION: '20'
   VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
   VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  # App is in the docgen-ai subdirectory
+  WORKING_DIR: './docgen-ai'
 
 jobs:
   lint:
-    name: Lint
+    name: Type Check
     runs-on: ubuntu-latest
 
     steps:
@@ -29,13 +29,15 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+          cache-dependency-path: ${{ env.WORKING_DIR }}/package-lock.json
 
       - name: Install dependencies
+        working-directory: ${{ env.WORKING_DIR }}
         run: npm ci
 
-      - name: Run linter
-        run: npm run lint
-        continue-on-error: false
+      - name: TypeScript type check
+        working-directory: ${{ env.WORKING_DIR }}
+        run: npx tsc --noEmit
 
   test:
     name: Test
@@ -50,20 +52,15 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+          cache-dependency-path: ${{ env.WORKING_DIR }}/package-lock.json
 
       - name: Install dependencies
+        working-directory: ${{ env.WORKING_DIR }}
         run: npm ci
 
       - name: Run tests
+        working-directory: ${{ env.WORKING_DIR }}
         run: npm test
-
-      - name: Upload coverage reports
-        uses: codecov/codecov-action@v4
-        if: always()
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage/lcov.info
-          fail_ci_if_error: false
 
   build:
     name: Build
@@ -79,25 +76,21 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+          cache-dependency-path: ${{ env.WORKING_DIR }}/package-lock.json
 
       - name: Install dependencies
+        working-directory: ${{ env.WORKING_DIR }}
         run: npm ci
 
       - name: Build project
+        working-directory: ${{ env.WORKING_DIR }}
         run: npm run build
-        env:
-          CI: true
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
-        if: success()
         with:
           name: build
-          path: |
-            dist/
-            build/
-            .next/
-            public/
+          path: ${{ env.WORKING_DIR }}/dist
           retention-days: 7
 
   deploy-preview:
@@ -115,6 +108,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+          cache-dependency-path: ${{ env.WORKING_DIR }}/package-lock.json
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
@@ -123,10 +117,12 @@ jobs:
         run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Build Project Artifacts
+        working-directory: ${{ env.WORKING_DIR }}
         run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy Preview to Vercel
         id: vercel-deploy
+        working-directory: ${{ env.WORKING_DIR }}
         run: |
           url=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
           echo "preview-url=$url" >> $GITHUB_OUTPUT
@@ -167,6 +163,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+          cache-dependency-path: ${{ env.WORKING_DIR }}/package-lock.json
 
       - name: Install Vercel CLI
         run: npm install --global vercel@latest
@@ -175,10 +172,12 @@ jobs:
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Build Project Artifacts
+        working-directory: ${{ env.WORKING_DIR }}
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy Production to Vercel
         id: vercel-deploy
+        working-directory: ${{ env.WORKING_DIR }}
         run: |
           url=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
           echo "production-url=$url" >> $GITHUB_OUTPUT
@@ -189,24 +188,3 @@ jobs:
           echo "URL: ${{ steps.vercel-deploy.outputs.production-url }}"
           echo "Commit: ${{ github.sha }}"
           echo "Branch: ${{ github.ref_name }}"
-
-      - name: Notify on Success
-        uses: 8398a7/action-slack@v3
-        if: success()
-        with:
-          status: custom
-          custom_payload: |
-            {
-              text: '🚀 Production deployment successful!',
-              attachments: [{
-                color: 'good',
-                fields: [
-                  { title: 'Repository', value: '${{ github.repository }}', short: true },
-                  { title: 'Branch', value: '${{ github.ref_name }}', short: true },
-                  { title: 'Commit', value: '${{ github.sha }}', short: true },
-                  { title: 'URL', value: '${{ steps.vercel-deploy.outputs.production-url }}', short: false }
-                ]
-              }]
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
