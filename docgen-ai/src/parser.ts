@@ -65,7 +65,7 @@ export function parseFile(filePath: string): CodeStructure {
   const visitor = {
     // Extract imports
     ImportDeclaration(path: any) {
-      if (path.node.source?.value) {
+      if (path.node.source && path.node.source.value) {
         structure.imports.push(path.node.source.value);
       }
     },
@@ -74,10 +74,13 @@ export function parseFile(filePath: string): CodeStructure {
     FunctionDeclaration(path: any) {
       const node = path.node;
       const funcInfo: FunctionInfo = {
-        name: node.id?.name || 'anonymous',
-        params: node.params.map((p: any) => p.name || p.type?.name || '').join(', '),
-        returnType: node.returnType?.type?.name,
-        location: { file: filePath, line: node.loc?.start.line || 0 },
+        name: node.id && node.id.name ? node.id.name : 'anonymous',
+        params: node.params.map((p: any) => {
+          const name = p.name || (p.type && p.type.name) || '';
+          return name;
+        }).join(', '),
+        returnType: node.returnType && node.returnType.type ? node.returnType.type.name : undefined,
+        location: { file: filePath, line: node.loc && node.loc.start.line ? node.loc.start.line : 0 },
         isExported: false,
         isAsync: node.async || false,
       };
@@ -87,12 +90,12 @@ export function parseFile(filePath: string): CodeStructure {
     // Export named functions
     ExportNamedDeclaration(path: any) {
       const node = path.node.declaration;
-      if (node?.type === 'FunctionDeclaration') {
+      if (node && node.type === 'FunctionDeclaration') {
         const funcInfo: FunctionInfo = {
-          name: node.id?.name || 'anonymous',
-          params: node.params.map((p: any) => p.name || '').join(', ''),
-          returnType: node.returnType?.type?.name,
-          location: { file: filePath, line: node.loc?.start.line || 0 },
+          name: node.id && node.id.name ? node.id.name : 'anonymous',
+          params: node.params.map((p: any) => p.name || '').join(', '),
+          returnType: node.returnType && node.returnType.type ? node.returnType.type.name : undefined,
+          location: { file: filePath, line: node.loc && node.loc.start.line ? node.loc.start.line : 0 },
           isExported: true,
           isAsync: node.async || false,
         };
@@ -104,11 +107,11 @@ export function parseFile(filePath: string): CodeStructure {
     ClassDeclaration(path: any) {
       const node = path.node;
       const classInfo: ClassInfo = {
-        name: node.id?.name || 'Anonymous',
+        name: node.id && node.id.name ? node.id.name : 'Anonymous',
         methods: [],
         properties: [],
-        extends: node.superClass?.name,
-        location: { file: filePath, line: node.loc?.start.line || 0 },
+        extends: node.superClass && node.superClass.name ? node.superClass.name : undefined,
+        location: { file: filePath, line: node.loc && node.loc.start.line ? node.loc.start.line : 0 },
       };
       structure.classes.push(classInfo);
     },
@@ -117,18 +120,18 @@ export function parseFile(filePath: string): CodeStructure {
     ClassMethod(path: any) {
       const node = path.node;
       const methodInfo: FunctionInfo = {
-        name: node.key?.name || 'method',
-        params: node.params?.map((p: any) => p.name || p.type?.name || '').join(', ') || '',
-        returnType: node.returnType?.type?.name,
-        location: { file: filePath, line: node.loc?.start.line || 0 },
+        name: node.key && node.key.name ? node.key.name : 'method',
+        params: node.params ? node.params.map((p: any) => p.name || (p.type && p.type.name) || '').join(', ') : '',
+        returnType: node.returnType && node.returnType.type ? node.returnType.type.name : undefined,
+        location: { file: filePath, line: node.loc && node.loc.start.line ? node.loc.start.line : 0 },
         isExported: false,
         isAsync: node.async || false,
       };
 
       // Find parent class and add method
       const parent = path.findParent((p: any) => p.type === 'ClassDeclaration');
-      if (parent?.node?.name) {
-        const parentClass = structure.classes.find(c => c.name === parent.node.name);
+      if (parent && parent.node && parent.node.name) {
+        const parentClass = structure.classes.find((c: ClassInfo) => c.name === parent.node.name);
         if (parentClass) {
           parentClass.methods.push(methodInfo);
         }
@@ -139,10 +142,10 @@ export function parseFile(filePath: string): CodeStructure {
     TSInterfaceDeclaration(path: any) {
       const node = path.node;
       const interfaceInfo: InterfaceInfo = {
-        name: node.id?.name || 'Unnamed',
+        name: node.id && node.id.name ? node.id.name : 'Unnamed',
         properties: [],
         methods: [],
-        location: { file: filePath, line: node.loc?.start.line || 0 },
+        location: { file: filePath, line: node.loc && node.loc.start.line ? node.loc.start.line : 0 },
       };
       structure.interfaces.push(interfaceInfo);
     },
@@ -150,10 +153,10 @@ export function parseFile(filePath: string): CodeStructure {
     // Extract interface properties
     TSPropertySignature(path: any) {
       const node = path.node;
-      const propertyName = node.key?.name || 'unnamed';
+      const propertyName = node.key && node.key.name ? node.key.name : 'unnamed';
       const parent = path.findParent((p: any) => p.type === 'TSInterfaceDeclaration');
-      if (parent?.node?.name) {
-        const parentInterface = structure.interfaces.find(i => i.name === parent.node.name);
+      if (parent && parent.node && parent.node.name) {
+        const parentInterface = structure.interfaces.find((i: InterfaceInfo) => i.name === parent.node.name);
         if (parentInterface) {
           parentInterface.properties.push(propertyName);
         }
@@ -164,19 +167,19 @@ export function parseFile(filePath: string): CodeStructure {
     TSTypeAliasDeclaration(path: any) {
       const node = path.node;
       const typeInfo: TypeInfo = {
-        name: node.id?.name || 'Unnamed',
+        name: node.id && node.id.name ? node.id.name : 'Unnamed',
         type: 'object', // Simplified for now
-        location: { file: filePath, line: node.loc?.start.line || 0 },
+        location: { file: filePath, line: node.loc && node.loc.start.line ? node.loc.start.line : 0 },
       };
       structure.types.push(typeInfo);
     },
   };
 
   // Walk the AST
-  // @ts-ignore - visitor types
-  // @ts-ignore - traverse function
-  // @ts-ignore
-  (ast as any).traverse(visitor);
+  const traverse = (ast as any).traverse;
+  if (traverse) {
+    traverse.call(ast, visitor);
+  }
 
   return structure;
 }
@@ -220,7 +223,7 @@ function getAllFiles(dirPath: string, extensions: string[]): string[] {
   function scan(currentPath: string) {
     const entries = fs.readdirSync(currentPath, { withFileTypes: true });
 
-    for (const entry of entries as any[]) {
+    for (const entry of entries) {
       const fullPath = path.join(currentPath, entry.name);
 
       if (entry.isDirectory()) {
@@ -228,7 +231,7 @@ function getAllFiles(dirPath: string, extensions: string[]): string[] {
         if (!entry.name.startsWith('.') && entry.name !== 'node_modules') {
           scan(fullPath);
         }
-      } else if (extensions.some(ext => entry.name.endsWith(ext))) {
+      } else if (extensions.some((ext: string) => entry.name.endsWith(ext))) {
         files.push(fullPath);
       }
     }
