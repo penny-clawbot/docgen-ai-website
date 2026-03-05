@@ -1,0 +1,20 @@
+# Simple test workflow
+name: Test Workflow
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  hello:
+    name: Hello World
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run a one-line script
+        run: echo "Hello, World! The CI/CD pipeline is working!"
