@@ -1,3 +1,30 @@
-# CI/CD Test
-# CI/CD Pipeline Test - Thu Mar  5 11:43:28 EST 2026
-# CI/CD Pipeline Test - Thu Mar  5 11:43:29 EST 2026
+# DocGen AI
+
+AI-powered documentation generator from codebase using AST parsing.
+
+## Installation
+
+```bash
+npm install
+```
+
+## Build
+
+```bash
+npm run build
+```
+
+## Usage
+
+```bash
+npm start
+```
+
+## Deployment
+
+Project is deployed on Vercel: https://docgen-ai-eight.vercel.app
+
+## CI/CD
+
+- GitHub Actions configuration (currently not triggering)
+- Vercel automatic deployments working
